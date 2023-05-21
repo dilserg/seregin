@@ -11,21 +11,4 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='Artist',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('Artist_id', models.PositiveIntegerField()),
-                ('Artist_name', models.CharField(max_length=255, verbose_name='Имя исполнителя')),
-            ],
-        ),
-        migrations.CreateModel(
-            name='User',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('User_id', models.PositiveIntegerField()),
-                ('Artist_id', models.PositiveIntegerField()),
-                ('Scrobbles', models.PositiveIntegerField()),
-            ],
-        ),
     ]

@@ -1,0 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@100;400&display=swap');
+
+* {
+  font-family: 'Roboto', sans-serif;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.input-file {
+	margin-bottom: 12px;
+	position: relative;
+	display: inline-block;
+}
+
+.input-file span {
+	position: relative;
+	display: inline-block;
+	cursor: pointer;
+	outline: none;
+	text-decoration: none;
+	font-size: 14px;
+	vertical-align: middle;
+	color: rgb(255 255 255);
+	text-align: center;
+	border-radius: 4px;
+	background-color: #d4a373;
+	line-height: 22px;
+	height: 40px;
+	padding: 10px 20px;
+	box-sizing: border-box;
+	border: none;
+	margin: 0;
+	transition: background-color 0.2s;
+}
+
+.input-file input[type=file] {
+	position: absolute;
+	z-index: -1;
+	opacity: 0;
+	display: block;
+	width: 0;
+	height: 0;
+}
+ 
+/* Focus */
+.input-file input[type=file]:focus + span {
+	box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+ 
+/* Hover/active */
+.input-file:hover span {
+	background-color: #ccd5ae;
+	color: black;
+}
+.input-file:active span {
+	background-color: #2E703A;
+}
+ 
+/* Disabled */
+.input-file input[type=file]:disabled + span {
+	background-color: #eee;
+}
+
+.container {
+	padding: 40px;
+	height: 100vh;
+	background: #fefae0;
+}
+
+.button {
+	border-radius: 5px;
+	padding: 4px 12px;
+	outline: none;
+	border: none;
+	background-color: #e9edc9;
+	cursor: pointer;
+	transition: background-color 0.2s;c
+	color: white;
+}
+
+.button:hover {
+	background-color: #ccd5ae;
+	color: black;
+}
+
+.button:disabled {
+	background-color: #e9edc9;
+	color: #dad7cd;
+	cursor: not-allowed;
+}
+
+.title {
+	margin-bottom: 30px;
+}
+
+.result {
+	display: flex;
+	flex-direction: column;
+	max-width: 500px;
+	gap: 12px;
+}
+
+.item {
+	display: flex;
+	align-items: center;
+	font-size: 24px;
+	justify-content: space-between;
+}
+
+.hidden {
+	display: none;
+}

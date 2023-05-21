@@ -1,46 +1,115 @@
 from django.shortcuts import render, redirect
+from django.http import JsonResponse
 from django.views.generic.base import View
+import json
+import codecs
+import csv
+# Нужные библиотеки и предобученные модели
+import pickle
+import joblib
+import nltk
 import numpy as np
 import pandas as pd
-from .models import User, Artist
-from scipy import sparse
-from sklearn.preprocessing import normalize
+# import catboost
+from catboost import CatBoostClassifier
+from tensorflow import keras
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from sklearn.feature_extraction.text import CountVectorizer
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+
+with open('static/columns_action.pkl', 'rb') as inp:
+    columns_action = pickle.load(inp)
+
+model1 = keras.models.load_model('static/model_mlp.h5')
+
+model2 = CatBoostClassifier()
+model2.load_model('static/model_catboost.cbm')
+
+
+def find_class_swap(df, columns_action, model1):
+    # Удаление ненужного столбца ID
+    df.drop('id', axis=1, inplace=True)
+    df_to_show = df.copy()
+
+    # Инициализация инструментов NLTK
+    nltk.download('stopwords')
+    nltk.download('wordnet')
+    nltk.download('punkt')
+
+    # Удаление стоп-слов
+    stop_words = set(stopwords.words('russian'))
+
+    # Инициализация лемматизатора
+    lemmatizer = WordNetLemmatizer()
+
+    # Функция для обработки текста
+    def process_text(text):
+        # Приведение текста к нижнему регистру
+        # print(text)
+        text = text.lower()
+        # Токенизация текста
+        tokens = nltk.word_tokenize(text, language='russian')
+        # Удаление стоп-слов и пунктуации
+        filtered_tokens = [token for token in tokens if token.isalpha() and token not in stop_words]
+        # Лемматизация токенов
+        lemmatized_tokens = [lemmatizer.lemmatize(token) for token in filtered_tokens]
+        # Соединение токенов обратно в текст
+        processed_text = ' '.join(lemmatized_tokens)
+        return processed_text
+
+    # Используем наш Series columns_action, содержащий в себе предобученные модели для изменения датафрейма
+    # 0 — колонка будет дропнута
+    for col_name, action in zip(columns_action.index, columns_action.values):
+        if action == 0:
+            df.drop(col_name, axis=1, inplace=True)
+        elif type(action) == type(OneHotEncoder()):
+            df[col_name] = action.transform(df[[col_name]]).toarray().tolist()
+        elif type(action) == type(LabelEncoder()):
+            df[col_name] = action.transform(df[col_name])
+        elif type(action) == type(CountVectorizer()):
+            df[col_name] = action.transform(df[col_name].apply(process_text)).toarray().tolist()
+
+    # Формируем из датафрейма с нестандартной размерностью нормальный тензор
+    df_np = np.array(df)
+    vector_len = len(np.hstack([df_np[0][j] for j in range(len(df_np[0]))]))
+    x = np.empty([df_np.shape[0], vector_len])
+
+    for i in range(len(x)):
+        x[i] = np.hstack([df_np[i][j] for j in range(len(df_np[i]))])
+
+    # Используем предобученную модель НС
+    # pred = model1.predict(x)
+    pred = model2.predict(x)
+
+    # Преобразуем вероятности в классы
+    pred_1 = np.array([1 if prob > 0.5 else 0 for prob in np.ravel(pred)])
+
+    # Возвращаем датафрейм, содержащий в себе элементы с предсказанием изменения класса
+    ans = df_to_show[pred_1 == 1]
+    ans['Тип обращения итоговый'] = np.where(ans['Тип обращения на момент подачи'] == 'Запрос', 'Инцидент', 'Запрос')
+    ans['Тип переклассификации'] = np.where(ans['Тип обращения на момент подачи'] == 'Запрос', 1, 2)
+
+    return ans
+
 
 # Create your views here.
-class RandomArtistView(View):
+class IndexView(View):
   def get(self, request):
-    artists = Artist.objects.order_by("?")[:10]
-    return render(request, 'rate/rate.html', {'artist_list': artists})
+    return render(request, 'index.html')
+
 
 class ResultView(View):
   def get(self, request):
-    id_list = request.GET.getlist('id')
-    artists = Artist.objects.filter(id__in=id_list)
-    print(artists)
-    return render(request, 'result/result.html', {'artist_list': artists})
+    result = request.GET
+    return render(request, 'result.html', result)
 
 class PredictView(View):
   def post(self, request):
-    form = request.POST.dict()
-    del form['csrfmiddlewaretoken']
-    p = [(int(key), int(value)) for key, value in form.items()]
-   
-    interactions_df = pd.DataFrame(list(User.objects.all().values('User_id', 'Artist_id', 'Scrobbles')))
-    title_dict = Artist.objects.all()
-    new_i = max(interactions_df['User_id']) + 1
-    for i, score in p:
-      interactions_df.loc[len(interactions_df.index)] = [new_i, i, score*500]
-    rows, r_pos = np.unique(interactions_df.values[:,0], return_inverse=True)
-    cols, c_pos = np.unique(interactions_df.values[:,1], return_inverse=True)
-    artists_sparse = sparse.csr_matrix((interactions_df.values[:,2], (r_pos, c_pos)))
-    Pui = normalize(artists_sparse, norm='l2',axis=1)
-    artists_sparse_transposed = artists_sparse.transpose(copy=True)
-    Piu = normalize(artists_sparse_transposed, norm='l2', axis=1)
-    similarity = Pui * Piu * Pui
-    prev = [title_dict[i+1] for i in np.nonzero(artists_sparse[new_i-1])[1].tolist()]
-    usim = [title_dict[i+1] for i in similarity[new_i-1].toarray().argsort()[0][-20:].tolist()]
-    result = set(usim) - set(prev)
-    url = '/result/?'
-    for artist in result:
-      url += f'id={artist.id}&'
-    return redirect(url[:-1])
+    file = request.FILES['file']    
+    df = pd.read_csv(file)
+    result = find_class_swap(df, columns_action, model1).values.tolist()
+    return JsonResponse({
+        'result': result
+    })
+     
